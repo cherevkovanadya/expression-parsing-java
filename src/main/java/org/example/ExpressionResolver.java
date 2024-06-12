@@ -5,7 +5,7 @@ import java.util.Stack;
 public class ExpressionResolver {
 
     public static void main(String[] args) {
-        String expression = "(1 + (2 * 3) - (4 / 2))";
+        String expression = "(1 + ((-2) * 3) - (4 / 2) - (-5))";
 
         try {
             double result = evaluateExpression(expression);
@@ -19,6 +19,7 @@ public class ExpressionResolver {
         Stack<Double> operands = new Stack<>();
         Stack<Character> operators = new Stack<>();
         int length = expression.length();
+        boolean expectOperand = true;
 
         for (int i = 0; i < length; i++) {
             char currentChar = expression.charAt(i);
@@ -35,18 +36,35 @@ public class ExpressionResolver {
                 }
                 i--;
                 operands.push(Double.parseDouble(number.toString()));
+                expectOperand = false;
             } else if (currentChar == '(') {
                 operators.push(currentChar);
+                expectOperand = true;
             } else if (currentChar == ')') {
                 while (operators.peek() != '(') {
                     operands.push(applyOperator(operators.pop(), operands.pop(), operands.pop()));
                 }
-                operators.pop();
+                operators.pop(); // pop '('
+                expectOperand = false;
             } else if (isOperator(currentChar)) {
-                while (!operators.isEmpty() && precedence(currentChar) <= precedence(operators.peek())) {
-                    operands.push(applyOperator(operators.pop(), operands.pop(), operands.pop()));
+                if (currentChar == '-' && expectOperand) {
+                    StringBuilder number = new StringBuilder();
+                    number.append(currentChar);
+                    i++;
+                    while (i < length && (Character.isDigit(expression.charAt(i)) || expression.charAt(i) == '.')) {
+                        number.append(expression.charAt(i));
+                        i++;
+                    }
+                    i--;
+                    operands.push(Double.parseDouble(number.toString()));
+                    expectOperand = false;
+                } else {
+                    while (!operators.isEmpty() && precedence(currentChar) <= precedence(operators.peek())) {
+                        operands.push(applyOperator(operators.pop(), operands.pop(), operands.pop()));
+                    }
+                    operators.push(currentChar);
+                    expectOperand = true;
                 }
-                operators.push(currentChar);
             } else {
                 throw new IllegalArgumentException("Invalid character in expression");
             }
@@ -68,31 +86,25 @@ public class ExpressionResolver {
     }
 
     private static int precedence(char operator) {
-        switch (operator) {
-            case '+':
-            case '-':
-                return 1;
-            case '*':
-            case '/':
-                return 2;
-        }
-        return -1;
+        return switch (operator) {
+            case '+', '-' -> 1;
+            case '*', '/' -> 2;
+            default -> -1;
+        };
     }
 
     private static double applyOperator(char operator, double b, double a) {
-        switch (operator) {
-            case '+':
-                return a + b;
-            case '-':
-                return a - b;
-            case '*':
-                return a * b;
-            case '/':
+        return switch (operator) {
+            case '+' -> a + b;
+            case '-' -> a - b;
+            case '*' -> a * b;
+            case '/' -> {
                 if (b == 0) {
                     throw new IllegalArgumentException("Division by zero");
                 }
-                return a / b;
-        }
-        return 0;
+                yield a / b;
+            }
+            default -> 0;
+        };
     }
 }
