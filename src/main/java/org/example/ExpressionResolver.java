@@ -1,21 +1,35 @@
 package org.example;
 
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Scanner;
 import java.util.Stack;
 
 public class ExpressionResolver {
 
     public static void main(String[] args) {
-        String expression = "(1 + ((-2) * 3) - (4 / 2) - (-5))";
+        String expression = "(x + (2 * 3) - (4 / 2))";
+        Map<Character, Double> variables = new HashMap<>();
+        variables.put('x', null);
+
+        Scanner scanner = new Scanner(System.in);
+        for (char variable : variables.keySet()) {
+            System.out.print("Enter the value for variable " + variable + ": ");
+            double value = scanner.nextDouble();
+            variables.put(variable, value);
+        }
 
         try {
-            double result = evaluateExpression(expression);
+            double result = evaluateExpression(expression, variables);
             System.out.println("Result: " + result);
         } catch (IllegalArgumentException e) {
             System.out.println("Error: " + e.getMessage());
+        } finally {
+            scanner.close();
         }
     }
 
-    public static double evaluateExpression(String expression) {
+    public static double evaluateExpression(String expression, Map<Character, Double> variables) {
         Stack<Double> operands = new Stack<>();
         Stack<Character> operators = new Stack<>();
         int length = expression.length();
@@ -28,7 +42,14 @@ public class ExpressionResolver {
                 continue;
             }
 
-            if (Character.isDigit(currentChar) || currentChar == '.') {
+            if (Character.isLetter(currentChar)) {
+                if (variables.containsKey(currentChar)) {
+                    operands.push(variables.get(currentChar));
+                } else {
+                    throw new IllegalArgumentException("Undefined variable: " + currentChar);
+                }
+                expectOperand = false;
+            } else if (Character.isDigit(currentChar) || currentChar == '.') {
                 StringBuilder number = new StringBuilder();
                 while (i < length && (Character.isDigit(expression.charAt(i)) || expression.charAt(i) == '.')) {
                     number.append(expression.charAt(i));
@@ -44,7 +65,7 @@ public class ExpressionResolver {
                 while (operators.peek() != '(') {
                     operands.push(applyOperator(operators.pop(), operands.pop(), operands.pop()));
                 }
-                operators.pop(); // pop '('
+                operators.pop();
                 expectOperand = false;
             } else if (isOperator(currentChar)) {
                 if (currentChar == '-' && expectOperand) {
