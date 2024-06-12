@@ -8,7 +8,7 @@ import java.util.Stack;
 public class ExpressionResolver {
 
     public static void main(String[] args) {
-        String expression = "(x + (2 * 3) - (4 / 2))";
+        String expression = "sin(x) + (2 * 3) - (4 / 2)";
         Map<Character, Double> variables = new HashMap<>();
         variables.put('x', null);
 
@@ -43,12 +43,25 @@ public class ExpressionResolver {
             }
 
             if (Character.isLetter(currentChar)) {
-                if (variables.containsKey(currentChar)) {
-                    operands.push(variables.get(currentChar));
-                } else {
-                    throw new IllegalArgumentException("Undefined variable: " + currentChar);
+                StringBuilder function = new StringBuilder();
+                while (i < length && Character.isLetter(expression.charAt(i))) {
+                    function.append(expression.charAt(i));
+                    i++;
                 }
-                expectOperand = false;
+                i--;
+
+                String functionName = function.toString();
+                if (isFunction(functionName)) {
+                    operators.push(getFunctionSymbol(functionName));
+                    expectOperand = false;
+                } else {
+                    if (variables.containsKey(currentChar)) {
+                        operands.push(variables.get(currentChar));
+                    } else {
+                        throw new IllegalArgumentException("Undefined variable: " + currentChar);
+                    }
+                    expectOperand = false;
+                }
             } else if (Character.isDigit(currentChar) || currentChar == '.') {
                 StringBuilder number = new StringBuilder();
                 while (i < length && (Character.isDigit(expression.charAt(i)) || expression.charAt(i) == '.')) {
@@ -62,10 +75,19 @@ public class ExpressionResolver {
                 operators.push(currentChar);
                 expectOperand = true;
             } else if (currentChar == ')') {
-                while (operators.peek() != '(') {
-                    operands.push(applyOperator(operators.pop(), operands.pop(), operands.pop()));
+                while (!operators.isEmpty() && operators.peek() != '(') {
+                    char operator = operators.pop();
+                    if (isFunctionOperator(operator)) {
+                        operands.push(applyFunction(operator, operands.pop()));
+                    } else {
+                        operands.push(applyOperator(operator, operands.pop(), operands.pop()));
+                    }
                 }
-                operators.pop();
+                if (!operators.isEmpty() && operators.peek() == '(') {
+                    operators.pop();
+                } else {
+                    throw new IllegalArgumentException("Invalid expression");
+                }
                 expectOperand = false;
             } else if (isOperator(currentChar)) {
                 if (currentChar == '-' && expectOperand) {
@@ -81,7 +103,12 @@ public class ExpressionResolver {
                     expectOperand = false;
                 } else {
                     while (!operators.isEmpty() && precedence(currentChar) <= precedence(operators.peek())) {
-                        operands.push(applyOperator(operators.pop(), operands.pop(), operands.pop()));
+                        char operator = operators.pop();
+                        if (isFunctionOperator(operator)) {
+                            operands.push(applyFunction(operator, operands.pop()));
+                        } else {
+                            operands.push(applyOperator(operator, operands.pop(), operands.pop()));
+                        }
                     }
                     operators.push(currentChar);
                     expectOperand = true;
@@ -92,7 +119,12 @@ public class ExpressionResolver {
         }
 
         while (!operators.isEmpty()) {
-            operands.push(applyOperator(operators.pop(), operands.pop(), operands.pop()));
+            char operator = operators.pop();
+            if (isFunctionOperator(operator)) {
+                operands.push(applyFunction(operator, operands.pop()));
+            } else {
+                operands.push(applyOperator(operator, operands.pop(), operands.pop()));
+            }
         }
 
         if (operands.size() != 1) {
@@ -106,10 +138,29 @@ public class ExpressionResolver {
         return c == '+' || c == '-' || c == '*' || c == '/';
     }
 
+    private static boolean isFunction(String functionName) {
+        return functionName.equals("sin") || functionName.equals("cos") || functionName.equals("tan") || functionName.equals("sqrt");
+    }
+
+    private static boolean isFunctionOperator(char operator) {
+        return operator == 's' || operator == 'c' || operator == 't' || operator == 'q';
+    }
+
+    private static char getFunctionSymbol(String functionName) {
+        return switch (functionName) {
+            case "sin" -> 's';
+            case "cos" -> 'c';
+            case "tan" -> 't';
+            case "sqrt" -> 'q';
+            default -> throw new IllegalArgumentException("Unknown function: " + functionName);
+        };
+    }
+
     private static int precedence(char operator) {
         return switch (operator) {
             case '+', '-' -> 1;
             case '*', '/' -> 2;
+            case 's', 'c', 't', 'q' -> 3;
             default -> -1;
         };
     }
@@ -125,6 +176,16 @@ public class ExpressionResolver {
                 }
                 yield a / b;
             }
+            default -> 0;
+        };
+    }
+
+    private static double applyFunction(char operator, double operand) {
+        return switch (operator) {
+            case 's' -> Math.sin(operand);
+            case 'c' -> Math.cos(operand);
+            case 't' -> Math.tan(operand);
+            case 'q' -> Math.sqrt(operand);
             default -> 0;
         };
     }
